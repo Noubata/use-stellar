@@ -7,5 +7,11 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   banner: { js: '"use client";' },
-  external: ["react", "react-dom", "@stellar/stellar-sdk"],
+  external: [
+    "react",
+    "react-dom",
+    "@stellar/stellar-sdk",
+    "@albedo-link/intent",
+    "@stellar/freighter-api",
+  ],
 })
