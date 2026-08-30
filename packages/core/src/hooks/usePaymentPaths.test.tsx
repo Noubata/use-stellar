@@ -6,6 +6,10 @@
 import React, { type ReactNode } from "react"
 import { renderHook, waitFor } from "@testing-library/react"
 import { usePaymentPaths } from "./usePaymentPaths"
+import { QueryStore } from "../cache"
+
+/** Fresh per-test in-memory query store so useQuery snapshot/cache is isolated. */
+let mockQueryStore: QueryStore
 
 /** Testnet-only issuer. */
 const TEST_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
@@ -90,6 +94,7 @@ jest.mock("../context/StellarProvider", () => {
       wallet: { address: null },
       setWallet: jest.fn(),
       autoConnect: { enabled: false, persistAddress: false, storage: "local" as const },
+      queryStore: mockQueryStore,
     }),
   }
 })
@@ -97,6 +102,7 @@ jest.mock("../context/StellarProvider", () => {
 const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>
 
 beforeEach(() => {
+  mockQueryStore = new QueryStore()
   mockRecords = []
   mockError = null
   strictSendCalls = []

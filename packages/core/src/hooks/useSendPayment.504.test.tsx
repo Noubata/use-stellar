@@ -4,8 +4,21 @@ import { useSendPayment } from "./useSendPayment"
 import { StellarProvider } from "../context/StellarProvider"
 import type { WalletState } from "../types"
 
-// Mock the Stellar SDK
-jest.mock("@stellar/stellar-sdk")
+// Use the real SDK so TransactionBuilder/Operation/Asset/Memo can build a
+// genuine transaction; only the Horizon.Server constructor is mocked, keeping
+// network calls local. Loaded by relative file path to bypass the jest
+// moduleNameMapper (jest.requireActual would return the manual mock here).
+jest.mock("@stellar/stellar-sdk", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+  const real = require("../../node_modules/@stellar/stellar-sdk/lib/index.js") as any
+  return {
+    ...real,
+    Horizon: {
+      ...real.Horizon,
+      Server: jest.fn().mockImplementation(() => ({})),
+    },
+  }
+})
 jest.mock("../utils", () => ({
   ...jest.requireActual("../utils"),
   isBrowser: () => true,
@@ -13,58 +26,62 @@ jest.mock("../utils", () => ({
 }))
 
 // Mock wallet adapter
-jest.mock("../wallets", () => ({
-  getWalletAdapter: jest.fn(() => ({
-    signTransaction: jest.fn(xdr => Promise.resolve(xdr)),
-  })),
-}))
+jest.mock("../wallets", () => ({ getWalletAdapter: jest.fn() }))
 
 import { getHorizonServer } from "../utils"
+import { getWalletAdapter } from "../wallets"
 
 const mockGetServer = getHorizonServer as jest.Mock
+const mockGetWalletAdapter = getWalletAdapter as jest.Mock
+
+// Mock the context at file scope (a jest.mock nested inside describe is not
+// reliably applied), so the hook reads an injected connected wallet rather
+// than the real provider's default disconnected state.
+const mockWalletState: WalletState = {
+  connected: true,
+  address: "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
+  network: "testnet",
+  wallet: "freighter",
+  connecting: false,
+  error: null,
+  walletNetwork: "testnet",
+  walletName: "Freighter",
+}
+
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return <StellarProvider network="testnet">{children}</StellarProvider>
+}
+
+jest.mock("../context/StellarProvider", () => {
+  const actual = jest.requireActual("../context/StellarProvider")
+  return {
+    ...actual,
+    useStellarContext: () => ({
+      network: "testnet",
+      networkConfig: {
+        network: "testnet",
+        horizonUrl: "https://horizon-testnet.stellar.org",
+        sorobanUrl: "https://soroban-testnet.stellar.org",
+        networkPassphrase: "Test SDF Network ; September 2015",
+      },
+      wallet: mockWalletState,
+      setWallet: jest.fn(),
+      queryStore: { invalidate: jest.fn() },
+      autoConnect: {
+        enabled: false,
+        persistAddress: false,
+        storage: "local" as const,
+      },
+    }),
+  }
+})
 
 describe("useSendPayment - 504 Gateway Timeout handling", () => {
-  const mockWalletState: WalletState = {
-    connected: true,
-    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
-    network: "testnet",
-    wallet: "freighter",
-    connecting: false,
-    error: null,
-    walletNetwork: "testnet",
-    walletName: "Freighter",
-  }
-
-  function Wrapper({ children }: { children: React.ReactNode }) {
-    return <StellarProvider network="testnet">{children}</StellarProvider>
-  }
-
-  // Mock the context
-  jest.mock("../context/StellarProvider", () => {
-    const actual = jest.requireActual("../context/StellarProvider")
-    return {
-      ...actual,
-      useStellarContext: () => ({
-        network: "testnet",
-        networkConfig: {
-          network: "testnet",
-          horizonUrl: "https://horizon-testnet.stellar.org",
-          sorobanUrl: "https://soroban-testnet.stellar.org",
-          networkPassphrase: "Test SDF Network ; September 2015",
-        },
-        wallet: mockWalletState,
-        setWallet: jest.fn(),
-        autoConnect: {
-          enabled: false,
-          persistAddress: false,
-          storage: "local" as const,
-        },
-      }),
-    }
-  })
-
   beforeEach(() => {
     jest.clearAllMocks()
+    mockGetWalletAdapter.mockReturnValue({
+      signTransaction: jest.fn((xdr: string) => Promise.resolve(xdr)),
+    })
   })
 
   test("HTTP 504 produces TX_TIMEOUT with transaction hash", async () => {
@@ -82,7 +99,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -95,7 +112,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GD2AG7BZ2INWOP7LBSXMW5SHL2RMHSETUVIVFYJBYIWNNYK2MCXQNT2I",
         asset: "XLM",
         amount: "10",
       })
@@ -118,7 +135,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -131,7 +148,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GD2AG7BZ2INWOP7LBSXMW5SHL2RMHSETUVIVFYJBYIWNNYK2MCXQNT2I",
         asset: "XLM",
         amount: "10",
       })
@@ -161,7 +178,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -174,7 +191,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GD2AG7BZ2INWOP7LBSXMW5SHL2RMHSETUVIVFYJBYIWNNYK2MCXQNT2I",
         asset: "XLM",
         amount: "10",
       })
@@ -204,7 +221,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -215,7 +232,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GD2AG7BZ2INWOP7LBSXMW5SHL2RMHSETUVIVFYJBYIWNNYK2MCXQNT2I",
         asset: "XLM",
         amount: "10",
       })
@@ -245,7 +262,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
     mockGetServer.mockReturnValue({
       loadAccount: jest.fn().mockResolvedValue({
         sequenceNumber: () => "123",
-        accountId: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+        accountId: () => "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
         incrementSequenceNumber: jest.fn(),
       }),
       fetchBaseFee: jest.fn().mockResolvedValue(100),
@@ -258,7 +275,7 @@ describe("useSendPayment - 504 Gateway Timeout handling", () => {
 
     try {
       await result.current.send({
-        to: "GBBD47IF6LWK7P7MABN5KIK65Y6XVTX3CHGYVM4PBZSTSTBHX7WEEHQK",
+        to: "GD2AG7BZ2INWOP7LBSXMW5SHL2RMHSETUVIVFYJBYIWNNYK2MCXQNT2I",
         asset: "XLM",
         amount: "10",
       })

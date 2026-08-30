@@ -122,6 +122,7 @@ jest.mock("../context/StellarProvider", () => ({
     wallet: mockWalletState,
     setWallet: jest.fn(),
     autoConnect: { enabled: false, persistAddress: false, storage: "local" as const },
+    queryStore: { invalidate: jest.fn() },
   }),
 }))
 

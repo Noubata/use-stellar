@@ -28,8 +28,12 @@ export class Asset {
   }
 }
 
+export const TESTNET_ADDRESS_A = "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ"
+export const TESTNET_ADDRESS_B = "GD2AG7BZ2INWOP7LBSXMW5SHL2RMHSETUVIVFYJBYIWNNYK2MCXQNT2I"
+
 export const mockAccountRecord = {
-  id: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+  id: "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
+  accountId: () => "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
   sequenceNumber: () => "1234567890123456",
   subentry_count: 2,
   thresholds: {
@@ -39,7 +43,7 @@ export const mockAccountRecord = {
   },
   signers: [
     {
-      key: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+      key: "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
       weight: 1,
       type: "ed25519_public_key",
     },
@@ -143,6 +147,32 @@ export class MockHorizonServer {
 // Create singleton mock instance
 export const mockHorizonServer = new MockHorizonServer()
 
+// Response returned by a successful Horizon submitTransaction call.
+export const mockSubmitResponse = {
+  hash: "c9a17a4b8f6e3d2c1a0b9f8e7d6c5b4a39281716050403020100af0e9d8c7b6a",
+  successful: true,
+  ledger: 25826413,
+  envelope_xdr:
+    "AAAAAgAAAABh/DWYVf7iXjMzDvBV1J1QgjqFyKQc5YwB4I1LcQ7mIq4AAABkADy7zwAAAAEAAAAAAAAAAAAAAAAA",
+}
+
+/**
+ * Creates a fresh Horizon.Server-shaped mock for a single test. Each call
+ * returns an independent instance, so success/failure state never leaks
+ * between tests. `loadAccount` and `submitTransaction` are plain `jest.fn()s`
+ * so tests can `mockResolvedValue(...)` / `mockRejectedValueOnce(...)` and
+ * assert on call counts and arguments.
+ */
+export function createMockHorizonServer() {
+  const loadAccount = jest.fn().mockResolvedValue({
+    accountId: () => TESTNET_ADDRESS_A,
+    sequenceNumber: () => "1",
+  })
+  const submitTransaction = jest.fn().mockResolvedValue(mockSubmitResponse)
+  const fetchBaseFee = jest.fn().mockResolvedValue(100)
+  return { loadAccount, submitTransaction, fetchBaseFee }
+}
+
 // Mock the Horizon namespace
 export const Horizon = {
   Server: class Server {
@@ -156,7 +186,7 @@ export const Horizon = {
 // Mock Keypair for integration tests
 export const Keypair = {
   random: jest.fn(() => ({
-    publicKey: () => "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
+    publicKey: () => "GBZFVO7IGDCRQWCIN27OWEG7QKTS5TPRGPPNQUKDZFHKWODM6JXUJRAQ",
     secret: () => "SAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN",
   })),
 }
@@ -168,6 +198,9 @@ const stellarSdkMock = {
   Keypair,
   mockHorizonServer,
   mockServerResponses,
+  mockSubmitResponse,
+  createMockHorizonServer,
+  mockAccountRecord,
 }
 
 export default stellarSdkMock

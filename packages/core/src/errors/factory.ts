@@ -61,20 +61,13 @@ const WALLET_ERROR_CODES: Record<WalletAdapterErrorCode, StellarErrorCode> = {
 
 /** Classify a transaction that Horizon accepted but whose operations failed. */
 export function toSubmissionError(result: HorizonSubmissionResult): StellarError {
-  const operations = result.extras?.result_codes?.operations ?? []
   const resultCodes = result.extras?.result_codes
-  let code: StellarErrorCode = "TRANSACTION_FAILED"
-
-  if (operations.includes("op_no_trust")) {
-    code = "NO_TRUSTLINE"
-  } else if (
-    operations.includes("op_underfunded") ||
-    resultCodes?.transaction === "tx_insufficient_balance"
-  ) {
-    code = "INSUFFICIENT_BALANCE"
-  }
-
-  return createStellarError(code, undefined, {
+  // Reuse the same result-code classification as toStellarError so that
+  // transaction-level codes (tx_bad_seq, tx_insufficient_fee, tx_too_late,
+  // tx_no_source_account, ...) are named consistently instead of collapsing
+  // into a generic TRANSACTION_FAILED.
+  const code = resultCodes ? fromResultCodes(resultCodes) : undefined
+  return createStellarError(code ?? "TRANSACTION_FAILED", undefined, {
     raw: result,
     hash: result.hash,
   })
