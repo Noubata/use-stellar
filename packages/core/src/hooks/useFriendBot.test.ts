@@ -34,7 +34,7 @@ describe("useFriendbot", () => {
   })
 
   it("throws VALIDATION_ERROR instantly when on mainnet without making a request", async () => {
-    (useStellarContext as jest.Mock).mockReturnValue({
+    ;(useStellarContext as jest.Mock).mockReturnValue({
       network: "mainnet",
       wallet: { address: TESTNET_ACCOUNT },
     })
@@ -49,7 +49,7 @@ describe("useFriendbot", () => {
   })
 
   it("throws WALLET_NOT_CONNECTED when no address is provided and wallet is disconnected", async () => {
-    (useStellarContext as jest.Mock).mockReturnValue({
+    ;(useStellarContext as jest.Mock).mockReturnValue({
       network: "testnet",
       wallet: { address: null },
     })

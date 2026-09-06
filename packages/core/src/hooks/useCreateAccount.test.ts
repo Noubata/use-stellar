@@ -96,7 +96,7 @@ describe("useCreateAccount", () => {
   })
 
   it("fails early if wallet is not connected", async () => {
-    (useStellarContext as jest.Mock).mockReturnValue({
+    ;(useStellarContext as jest.Mock).mockReturnValue({
       network: "testnet",
       networkConfig: mockNetworkConfig,
       wallet: { ...mockWallet, connected: false },
