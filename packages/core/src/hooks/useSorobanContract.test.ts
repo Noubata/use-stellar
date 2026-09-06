@@ -420,7 +420,7 @@ describe("useSorobanContract — simulation source", () => {
   })
 
   it("honours an explicit source override", async () => {
-    const OTHER = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+    const OTHER = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
     mockWalletAddress = TEST_ADDRESS
     succeedWith(true)
 

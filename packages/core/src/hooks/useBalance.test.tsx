@@ -16,7 +16,7 @@ jest.mock("../utils", () => ({
 const mockGetHorizonServer = getHorizonServer as jest.Mock
 const loadAccount = jest.fn()
 
-const TEST_ADDRESS = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOACCWN"
+const TEST_ADDRESS = "GCL2KR4CDAZU3SECOM4CNJGBDYHWYD7UZ6OJMPRXZJM7TFPXHQZM4PRI"
 
 // Mock data in raw Horizon format (asset_type / asset_code / asset_issuer) so
 // the real parseHorizonBalance normalizes it during the fetch.

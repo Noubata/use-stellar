@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react"
 import type { StellarError } from "../errors"
 import type { QueryStore } from "../cache"
+import type { xdr } from "@stellar/stellar-sdk"
 
 export type { QueryConfig } from "../cache"
 
@@ -430,6 +431,12 @@ export interface UsePaymentsReturn {
   payments: NormalizedPayment[]
   loading: boolean
   error: StellarError | null
+  /**
+   * `true` when `error` is set but `payments` still holds data from a
+   * previous successful fetch (stale-while-revalidate). `false` once a
+   * fetch succeeds again, or when there is no data to be stale.
+   */
+  isStale: boolean
   refetch: () => void
   fetchNext: () => Promise<void>
   fetchPrev: () => Promise<void>
@@ -843,4 +850,194 @@ export interface UseTradesReturn {
   fetchPrev: () => Promise<void>
   /** Re-fetch the current page from Horizon. */
   refetch: () => void
+}
+
+// ── Soroban write ──────────────────────────────────────────────────────────
+
+export interface SorobanInvokeOptions {
+  contractId: string
+  method: string
+  /** Explicit XDR arguments to prevent type mismatches on write paths. */
+  args?: xdr.ScVal[]
+  /** Inclusion fee in stroops. Derived from simulation when omitted. */
+  fee?: string
+  /** Poll timeout in ms before giving up and surfacing TX_TIMEOUT. Defaults to 30000. */
+  timeout?: number
+}
+
+export interface UseSorobanWriteReturn<T = unknown> {
+  invoke: (options: SorobanInvokeOptions) => Promise<{ hash: string; result: T }>
+  loading: boolean
+  error: StellarError | null
+  result: { hash: string; result: T } | null
+  reset: () => void
+}
+
+// ── SEP-10 ─────────────────────────────────────────────────────────────────
+
+export interface UseSep10AuthOptions {
+  /** Anchor home domain, e.g. `"testanchor.stellar.org"`. */
+  homeDomain: string
+  /** Defaults to the connected wallet address. */
+  account?: string
+  /** Optional muxed/memo sub-account, per SEP-10. */
+  memo?: string
+  /** Client domain for client attribution. Advanced; omit for most uses. */
+  clientDomain?: string
+  /** Opt-in persistence of the JWT in localStorage. Defaults to `false`. */
+  persist?: boolean
+}
+
+export interface UseSep10AuthReturn {
+  /** The JWT, or `null` when unauthenticated or expired. */
+  token: string | null
+  /** Decoded `exp` as a Date. */
+  expiresAt: Date | null
+  authenticated: boolean
+  loading: boolean
+  error: StellarError | null
+  authenticate: () => Promise<string>
+  logout: () => void
+}
+
+// ── Offers ─────────────────────────────────────────────────────────────────
+
+export interface NormalizedOffer {
+  id: string
+  seller: string
+  selling: Asset
+  buying: Asset
+  amount: string
+  priceR: { n: number; d: number }
+  price: string
+}
+
+export interface UseOffersOptions {
+  address?: string | null
+  limit?: number
+  order?: "asc" | "desc"
+  cursor?: string
+}
+
+export interface UseOffersReturn {
+  offers: NormalizedOffer[]
+  loading: boolean
+  error: StellarError | null
+  refetch: () => void
+  fetchNext: () => Promise<void>
+  fetchPrev: () => Promise<void>
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface ManageOfferParams {
+  selling: Asset
+  buying: Asset
+  amount: string
+  price: string | { n: number; d: number }
+  side?: "sell" | "buy"
+}
+
+export interface UseManageOfferReturn {
+  createOffer: (o: ManageOfferParams) => Promise<TransactionResult | null>
+  updateOffer: (offerId: string, o: ManageOfferParams) => Promise<TransactionResult | null>
+  cancelOffer: (offerId: string) => Promise<TransactionResult | null>
+  loading: boolean
+  error: StellarError | null
+  result: TransactionResult | null
+  reset: () => void
+}
+
+// ── Orderbook ──────────────────────────────────────────────────────────────
+
+export interface OrderbookEntry {
+  /** Exact price as a rational — use this for arithmetic. */
+  priceR: { n: number; d: number }
+  /** Precise decimal string derived from priceR. Display only. */
+  price: string
+  amount: string
+}
+
+export interface UseOrderbookOptions {
+  selling: Asset
+  buying: Asset
+  limit?: number
+  watch?: boolean
+  interval?: number
+  enabled?: boolean
+}
+
+export interface UseOrderbookReturn {
+  bids: OrderbookEntry[]
+  asks: OrderbookEntry[]
+  /** null when either side is empty. */
+  spread: string | null
+  midPrice: string | null
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
+}
+
+// ── Create account ─────────────────────────────────────────────────────────
+
+export interface CreateAccountOptions extends FeeOptions {
+  destination: string
+  /** In XLM. Must meet the network's current base reserve. */
+  startingBalance: string
+}
+
+export interface UseCreateAccountReturn {
+  createAccount: (options: CreateAccountOptions) => Promise<TransactionResult>
+  loading: boolean
+  error: StellarError | null
+  result: TransactionResult | null
+  reset: () => void
+}
+
+// ── Friendbot ──────────────────────────────────────────────────────────────
+
+export interface UseFriendbotReturn {
+  /** Funds the provided address via Friendbot. Defaults to the connected wallet address. */
+  fund: (address?: string) => Promise<void>
+  loading: boolean
+  error: StellarError | null
+  funded: boolean
+}
+
+// ── Fee stats ──────────────────────────────────────────────────────────────
+
+export type FeeUrgency = "low" | "normal" | "high"
+
+export interface UseFeeStatsOptions {
+  /** When true, re-fetch fee stats on an interval. Default false. */
+  watch?: boolean
+  /** Polling interval in ms when `watch` is true. Default 10000. */
+  interval?: number
+}
+
+export interface UseFeeStatsReturn {
+  /** `last_ledger_base_fee` from Horizon, in stroops. */
+  baseFee: string
+  /** Charged-fee percentiles from the last 5 ledgers, in stroops. */
+  percentiles: Record<"p10" | "p50" | "p90" | "p95" | "p99", string>
+  /** True when `fee_charged.mode` is strictly greater than `last_ledger_base_fee`. */
+  isSurging: boolean
+  /** Returns a max fee bid in stroops: low → p50, normal → p90, high → p99. */
+  suggested: (urgency?: FeeUrgency) => string
+  loading: boolean
+  error: StellarError | null
+  lastUpdated: Date | null
+  refetch: () => Promise<void>
+}
+
+// ── Liquidity pools ────────────────────────────────────────────────────────
+
+export interface LiquidityPool {
+  id: string
+  fee_bp: number
+  type: string
+  total_trustlines: string
+  total_shares: string
+  reserves: { asset: string; amount: string }[]
 }
